@@ -6,10 +6,21 @@
   "bin": {
     "obnofi": "index.js"
   },
+  "files": [
+    "index.js",
+    "config.js",
+    "commands",
+    "README.md"
+  ],
   "scripts": {
     "start": "node index.js",
-    "check": "node index.js --help",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "check": "node -c index.js && node -c config.js && node -c commands/auth.js && node -c commands/note.js && node -c commands/db.js && node -c commands/feed.js",
+    "smoke": "OBNOFI_CONFIG_DIR=/tmp/obnofi-cli-smoke node index.js --help",
+    "pack:check": "npm_config_cache=/tmp/obnofi-cli-npm-cache npm pack --dry-run",
+    "prepublishOnly": "npm run check && npm run smoke && npm run pack:check",
+    "release:patch": "npm version patch && npm_config_cache=/tmp/obnofi-cli-npm-cache npm publish",
+    "release:minor": "npm version minor && npm_config_cache=/tmp/obnofi-cli-npm-cache npm publish",
+    "release:major": "npm version major && npm_config_cache=/tmp/obnofi-cli-npm-cache npm publish"
   },
   "keywords": [
     "cli",
