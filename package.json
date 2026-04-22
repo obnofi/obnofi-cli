@@ -1,0 +1,30 @@
+{
+  "name": "obnofi-cli",
+  "version": "1.0.0",
+  "description": "Obnofi CLI",
+  "main": "index.js",
+  "bin": {
+    "obnofi": "index.js"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "check": "node index.js --help",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "cli",
+    "obnofi"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "axios": "^1.7.2",
+    "chalk": "^4.1.2",
+    "commander": "^12.1.0",
+    "conf": "^13.0.1",
+    "inquirer": "^8.2.6",
+    "open": "^10.1.0",
+    "ora": "^5.4.1"
+  }
+}
