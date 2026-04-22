@@ -46,7 +46,40 @@ function registerFeedCommands(program) {
         process.exit(1);
       }
     });
+
+  feed
+    .command('add <url>')
+    .description('새 피드 소스 추가')
+    .action(async (url) => {
+      const spinner = ora('피드 소스 추가 중...').start();
+      try {
+        const client = config.createApiClient();
+        await client.post('/feeds/sources', { url });
+        spinner.succeed('완료');
+        console.log(chalk.green('✓'), '피드 소스를 추가했습니다.');
+      } catch (error) {
+        spinner.fail('실패');
+        console.error(chalk.red('✗'), error.response?.data?.message || error.message);
+        process.exit(1);
+      }
+    });
+
+  feed
+    .command('remove <source>')
+    .description('피드 소스 제거')
+    .action(async (source) => {
+      const spinner = ora('피드 소스 제거 중...').start();
+      try {
+        const client = config.createApiClient();
+        await client.delete(`/feeds/sources/${encodeURIComponent(source)}`);
+        spinner.succeed('완료');
+        console.log(chalk.green('✓'), '피드 소스를 제거했습니다.');
+      } catch (error) {
+        spinner.fail('실패');
+        console.error(chalk.red('✗'), error.response?.data?.message || error.message);
+        process.exit(1);
+      }
+    });
 }
 
 module.exports = { registerFeedCommands };
-
