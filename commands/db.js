@@ -96,37 +96,38 @@ function registerDbCommands(program) {
       try {
         const client = config.createApiClient();
         const { data } = await client.get(`/blocks/db-diagram/${pageId}/sql`);
-        spinner.succeed('완료');
         const sql = typeof data === 'string' ? data : data.sql;
         if (options.output) {
-          fs.writeFileSync(options.output, sql, 'utf8');
-          console.log(chalk.green('✓'), `${options.output} 저장 완료`);
+          fs.writeFileSync(options.output, sql);
+          console.log(chalk.green('✓'), `Saved to ${options.output}`);
         } else {
           console.log(sql);
         }
       } catch (error) {
-        spinner.fail('실패');
+        spinner.fail('가져오기 실패');
         console.error(chalk.red('✗'), error.response?.data?.message || error.message);
         process.exit(1);
       }
     });
 
   db.command('diff <file> <pageId>').action(async (file, pageId) => {
-    const spinner = ora('차이 계산 중...').start();
+    const spinner = ora('스키마 비교 중...').start();
     try {
       const localSql = fs.readFileSync(file, 'utf8');
+      spinner.text = '원격 스키마 가져오는 중...';
       const client = config.createApiClient();
       const { data } = await client.get(`/blocks/db-diagram/${pageId}/sql`);
       const remoteSql = typeof data === 'string' ? data : data.sql;
-      spinner.succeed('완료');
-      const lines = diffLines(localSql, remoteSql);
-      if (!lines.length) {
-        console.log(chalk.green('✓'), '차이가 없습니다.');
-        return;
+      spinner.succeed('비교 완료');
+
+      const result = diffLines(localSql, remoteSql);
+      if (result.length > 0) {
+        console.log(result.join('\n'));
+      } else {
+        console.log(chalk.green('✓'), '차이점이 없습니다.');
       }
-      lines.forEach((line) => console.log(line));
     } catch (error) {
-      spinner.fail('실패');
+      spinner.fail('비교 실패');
       console.error(chalk.red('✗'), error.response?.data?.message || error.message);
       process.exit(1);
     }
