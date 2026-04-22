@@ -107,20 +107,29 @@ function registerNoteCommands(program) {
 
   note
     .command('delete <id>')
-    .option('-y, --yes', 'Delete without confirmation')
+    .option('-y, --yes', 'Skip confirmation')
     .action(async (id, options) => {
       if (!options.yes) {
-        const answer = await inquirer.prompt([
-          { type: 'confirm', name: 'ok', message: `노트 ${id} 를 삭제할까요?`, default: false }
+        const { confirm } = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'confirm',
+            message: `정말로 '${id}' 노트를 삭제하시겠습니까?`,
+            default: false
+          }
         ]);
-        if (!answer.ok) return;
+        if (!confirm) {
+          console.log('취소되었습니다.');
+          return;
+        }
       }
 
-      const spinner = ora('삭제 중...').start();
+      const spinner = ora('노트 삭제 중...').start();
       try {
         const client = config.createApiClient();
         await client.delete(`/notes/${id}`);
         spinner.succeed('삭제 완료');
+        console.log(chalk.green('✓'), '노트를 삭제했습니다.');
       } catch (error) {
         spinner.fail('삭제 실패');
         console.error(chalk.red('✗'), error.response?.data?.message || error.message);
