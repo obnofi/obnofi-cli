@@ -5,42 +5,56 @@ const axios = require('axios');
 const chalk = require('chalk');
 const Conf = require('conf').default;
 
-const store = new Conf({
-  projectName: 'obnofi-cli',
-  cwd: process.env.OBNOFI_CONFIG_DIR || path.join(os.homedir(), '.config', 'obnofi-cli'),
-  defaults: {
-    baseUrl: 'https://api.obnofi.app'
+let storeInstance;
+
+function getStore() {
+  if (!storeInstance) {
+    storeInstance = new Conf({
+      projectName: 'obnofi-cli',
+      cwd: process.env.OBNOFI_CONFIG_DIR || path.join(os.homedir(), '.config', 'obnofi-cli'),
+      defaults: {
+        baseUrl: 'https://api.obnofi.app'
+      }
+    });
+  }
+  return storeInstance;
+}
+
+const store = new Proxy({}, {
+  get(_target, prop) {
+    const value = getStore()[prop];
+    return typeof value === 'function' ? value.bind(getStore()) : value;
   }
 });
 
 function getToken() {
-  return store.get('token');
+  return getStore().get('token');
 }
 
 function getBaseUrl() {
-  return store.get('baseUrl') || 'https://api.obnofi.app';
+  return getStore().get('baseUrl') || 'https://api.obnofi.app';
 }
 
 function setBaseUrl(url) {
-  store.set('baseUrl', url);
+  getStore().set('baseUrl', url);
 }
 
 function setAuth(payload) {
-  store.set('token', payload.token);
-  store.set('email', payload.email || '');
-  store.set('userId', payload.userId || '');
+  getStore().set('token', payload.token);
+  getStore().set('email', payload.email || '');
+  getStore().set('userId', payload.userId || '');
 }
 
 function clearAuth() {
-  store.delete('token');
-  store.delete('email');
-  store.delete('userId');
+  getStore().delete('token');
+  getStore().delete('email');
+  getStore().delete('userId');
 }
 
 function getProfile() {
   return {
-    email: store.get('email') || '',
-    userId: store.get('userId') || ''
+    email: getStore().get('email') || '',
+    userId: getStore().get('userId') || ''
   };
 }
 
