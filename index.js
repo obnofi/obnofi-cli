@@ -4,6 +4,7 @@ const { program } = require('commander');
 const chalk = require('chalk');
 
 const config = require('./config');
+const { showSplash } = require('./splash');
 const { registerAuthCommands } = require('./commands/auth');
 const { registerNoteCommands } = require('./commands/note');
 const { registerDbCommands } = require('./commands/db');
@@ -31,6 +32,15 @@ program.hook('preAction', (thisCommand, actionCommand) => {
   }
 });
 
-program.parse(process.argv);
+if (process.argv.length === 2) {
+  showSplash().then(() => {
+    process.exit(0);
+  }).catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+} else {
+  program.parse(process.argv);
+}
 
 
