@@ -18,9 +18,11 @@ obnofi <command> [options]
 
 ### `auth` - 인증 관리
 
-- **`obnofi auth login`**: 브라우저를 통해 OAuth로 로그인하고 토큰을 붙여넣습니다.
-  - `--token <token>`: 토큰을 직접 입력합니다.
-  - `--url <url>`: 자체 호스팅 서버 주소를 지정합니다.
+- **`obnofi auth login`**: 브라우저를 열고 승인 후 localhost callback으로 토큰을 자동 저장합니다.
+  - 예: `obnofi auth login --url http://localhost:3001`
+  - `--token <token>`: 자동 로그인 대신 토큰을 직접 저장합니다.
+  - `--url <url>`: 자체 호스팅 서버 주소를 지정합니다. 로컬 개발 환경에서 `http://localhost:3001`을 넣으면 웹 API 기준으로 내부 base는 `http://localhost:3000/api`로 맞춰 저장됩니다.
+  - 로컬 개발 환경에서 `cli-auth` 페이지도 자동으로 `http://localhost:3000/cli-auth`를 엽니다.
 - **`obnofi auth logout`**: 로그아웃합니다.
 - **`obnofi auth whoami`**: 현재 로그인된 계정 정보(이메일, 플랜)를 확인합니다.
 
@@ -54,5 +56,4 @@ obnofi <command> [options]
 
 ## 설정
 
-로그인 정보 및 설정은 `~/.config/obnofi-cli` 경로에 저장됩니다.
-
+로그인 정보 및 설정은 `~/.config/obnofi-cli` 경로에 저장됩니다. 브라우저 로그인이 어려운 환경에서는 `obnofi auth login --token <token>`으로 수동 fallback을 사용할 수 있습니다.
