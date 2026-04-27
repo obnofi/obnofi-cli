@@ -1,9 +1,55 @@
 const fs = require('fs');
+const path = require('path');
 
 const chalk = require('chalk');
 const ora = require('ora');
 
 const config = require('../config');
+
+function failUnsupportedSqlCommand(name) {
+  console.error(
+    chalk.red('✗'),
+    `${name} 는 현재 백엔드 API에 없습니다. APIDOCS.md에는 SQL push/pull/diff 엔드포인트가 정의되어 있지 않아요.`
+  );
+  process.exit(1);
+}
+
+function normalizeSql(sql) {
+  return String(sql || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\s+$/g, '');
+}
+
+function readSqlFile(file) {
+  if (!fs.existsSync(file)) {
+    throw new Error(`파일을 찾을 수 없어요: ${file}`);
+  }
+
+  const stat = fs.statSync(file);
+  if (!stat.isFile()) {
+    throw new Error(`파일 경로가 아니에요: ${file}`);
+  }
+
+  return normalizeSql(fs.readFileSync(file, 'utf8'));
+}
+
+function extractSqlPayload(data) {
+  if (typeof data === 'string') return normalizeSql(data);
+  if (typeof data?.sql === 'string') return normalizeSql(data.sql);
+  throw new Error('원격 SQL 응답 형식이 올바르지 않아요.');
+}
+
+function extractStats(data) {
+  return {
+    tables: data?.tables ?? data?.tableCount ?? data?.stats?.tables ?? 0,
+    columns: data?.columns ?? data?.columnCount ?? data?.stats?.columns ?? 0
+  };
+}
+
+function ensureParentDir(file) {
+  const dir = path.dirname(path.resolve(file));
+  fs.mkdirSync(dir, { recursive: true });
+}
 
 function diffLines(localSql, remoteSql) {
   const localLines = localSql.split('\n');
@@ -50,15 +96,25 @@ function diffLines(localSql, remoteSql) {
 function registerDbCommands(program) {
   const db = program.command('db').description('Database diagram commands');
 
-  db.command('ls').action(async () => {
+  db.command('ls').option('--search <query>', 'Search database title').action(async (options) => {
     const spinner = ora('DB 다이어그램 목록 불러오는 중...').start();
     try {
       const client = config.createApiClient();
-      const { data } = await client.get('/blocks/db-diagram');
+      const { data } = await client.get('/databases/search', {
+        params: { q: options.search }
+      });
       spinner.succeed('완료');
       const rows = Array.isArray(data) ? data : data.items || [];
+      if (rows.length === 0) {
+        console.log(chalk.dim('데이터베이스 페이지가 없습니다.'));
+        return;
+      }
+
       rows.forEach((item, idx) => {
-        console.log(`${chalk.dim(idx + 1)} ${chalk.bold(item.name || item.title || item.id)} ${chalk.dim(item.pageId || '')}`);
+        const meta = [item.id, item.databaseId].filter(Boolean).join(' · ');
+        console.log(
+          `${chalk.dim(String(idx + 1).padStart(2, ' '))} ${chalk.bold(item.name || item.title || item.id)} ${chalk.dim(meta)}`
+        );
       });
     } catch (error) {
       spinner.fail('실패');
@@ -70,67 +126,24 @@ function registerDbCommands(program) {
   db
     .command('push <file> <pageId>')
     .option('--merge', 'Merge with existing schema')
-    .action(async (file, pageId, options) => {
-      const spinner = ora('스키마 업로드 중...').start();
-      try {
-        const sql = fs.readFileSync(file, 'utf8');
-        const client = config.createApiClient();
-        const { data } = await client.post(`/blocks/db-diagram/${pageId}/sql`, {
-          sql,
-          merge: Boolean(options.merge)
-        });
-        spinner.succeed('업로드 완료');
-        console.log(chalk.green('✓'), `tables: ${chalk.dim(data.tables || 0)}, columns: ${chalk.dim(data.columns || 0)}`);
-      } catch (error) {
-        spinner.fail('업로드 실패');
-        console.error(chalk.red('✗'), error.response?.data?.message || error.message);
-        process.exit(1);
-      }
+    .action(async (file) => {
+      readSqlFile(file);
+      failUnsupportedSqlCommand('db push');
     });
 
   db
     .command('pull <pageId>')
     .option('-o, --output <file>', 'Write sql to file')
-    .action(async (pageId, options) => {
-      const spinner = ora('원격 스키마 가져오는 중...').start();
-      try {
-        const client = config.createApiClient();
-        const { data } = await client.get(`/blocks/db-diagram/${pageId}/sql`);
-        const sql = typeof data === 'string' ? data : data.sql;
-        if (options.output) {
-          fs.writeFileSync(options.output, sql);
-          console.log(chalk.green('✓'), `Saved to ${options.output}`);
-        } else {
-          console.log(sql);
-        }
-      } catch (error) {
-        spinner.fail('가져오기 실패');
-        console.error(chalk.red('✗'), error.response?.data?.message || error.message);
-        process.exit(1);
+    .action(async (_pageId, options) => {
+      if (options.output) {
+        ensureParentDir(options.output);
       }
+      failUnsupportedSqlCommand('db pull');
     });
 
-  db.command('diff <file> <pageId>').action(async (file, pageId) => {
-    const spinner = ora('스키마 비교 중...').start();
-    try {
-      const localSql = fs.readFileSync(file, 'utf8');
-      spinner.text = '원격 스키마 가져오는 중...';
-      const client = config.createApiClient();
-      const { data } = await client.get(`/blocks/db-diagram/${pageId}/sql`);
-      const remoteSql = typeof data === 'string' ? data : data.sql;
-      spinner.succeed('비교 완료');
-
-      const result = diffLines(localSql, remoteSql);
-      if (result.length > 0) {
-        console.log(result.join('\n'));
-      } else {
-        console.log(chalk.green('✓'), '차이점이 없습니다.');
-      }
-    } catch (error) {
-      spinner.fail('비교 실패');
-      console.error(chalk.red('✗'), error.response?.data?.message || error.message);
-      process.exit(1);
-    }
+  db.command('diff <file> <pageId>').action(async (file) => {
+    readSqlFile(file);
+    failUnsupportedSqlCommand('db diff');
   });
 }
 
