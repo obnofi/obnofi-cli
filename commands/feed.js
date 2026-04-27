@@ -6,79 +6,35 @@ const config = require('../config');
 function registerFeedCommands(program) {
   const feed = program.command('feed').description('Feed commands');
 
+  function unsupported() {
+    console.error(chalk.red('✗'), 'APIDOCS.md 기준 현재 feed 관련 HTTP API는 문서화되어 있지 않아요.');
+    process.exit(1);
+  }
+
   feed.command('ls').action(async () => {
-    const spinner = ora('피드 소스 조회 중...').start();
-    try {
-      const client = config.createApiClient();
-      const { data } = await client.get('/feeds/sources');
-      spinner.succeed('완료');
-      const rows = Array.isArray(data) ? data : data.items || [];
-      rows.forEach((item) => {
-        console.log(`${chalk.bold(item.name || item.source)} ${chalk.dim(item.url || '')}`);
-      });
-    } catch (error) {
-      spinner.fail('실패');
-      console.error(chalk.red('✗'), error.response?.data?.message || error.message);
-      process.exit(1);
-    }
+    unsupported();
   });
 
   feed
     .command('read')
     .option('--source <source>', 'Filter by source name')
     .option('-n, --limit <number>', 'Number of feed items', '10')
-    .action(async (options) => {
-      const spinner = ora('피드 읽는 중...').start();
-      try {
-        const client = config.createApiClient();
-        const { data } = await client.get('/feeds/items', {
-          params: { source: options.source, limit: Number(options.limit) }
-        });
-        spinner.succeed('완료');
-        const rows = Array.isArray(data) ? data : data.items || [];
-        rows.forEach((item) => {
-          console.log(`[${item.source || 'Feed'}] ${chalk.bold(item.title || '')}`);
-          console.log(`        ${chalk.dim(item.url || '')} · ${chalk.dim(item.relativeTime || item.publishedAt || '')}`);
-        });
-      } catch (error) {
-        spinner.fail('실패');
-        console.error(chalk.red('✗'), error.response?.data?.message || error.message);
-        process.exit(1);
-      }
+    .action(async () => {
+      unsupported();
     });
 
   feed
     .command('add <url>')
     .description('새 피드 소스 추가')
-    .action(async (url) => {
-      const spinner = ora('피드 소스 추가 중...').start();
-      try {
-        const client = config.createApiClient();
-        await client.post('/feeds/sources', { url });
-        spinner.succeed('완료');
-        console.log(chalk.green('✓'), '피드 소스를 추가했습니다.');
-      } catch (error) {
-        spinner.fail('실패');
-        console.error(chalk.red('✗'), error.response?.data?.message || error.message);
-        process.exit(1);
-      }
+    .action(async () => {
+      unsupported();
     });
 
   feed
     .command('remove <source>')
     .description('피드 소스 제거')
-    .action(async (source) => {
-      const spinner = ora('피드 소스 제거 중...').start();
-      try {
-        const client = config.createApiClient();
-        await client.delete(`/feeds/sources/${encodeURIComponent(source)}`);
-        spinner.succeed('완료');
-        console.log(chalk.green('✓'), '피드 소스를 제거했습니다.');
-      } catch (error) {
-        spinner.fail('실패');
-        console.error(chalk.red('✗'), error.response?.data?.message || error.message);
-        process.exit(1);
-      }
+    .action(async () => {
+      unsupported();
     });
 }
 
