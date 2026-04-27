@@ -10,6 +10,18 @@ const ora = require('ora');
 
 const config = require('../config');
 
+function formatContent(content) {
+  if (typeof content === 'string') return content;
+  if (content === null || typeof content === 'undefined') return '';
+  return JSON.stringify(content, null, 2);
+}
+
+function parseEditedContent(raw) {
+  const trimmed = raw.trim();
+  if (!trimmed) return {};
+  return JSON.parse(trimmed);
+}
+
 function registerNoteCommands(program) {
   const note = program.command('note').description('Note commands');
 
@@ -21,11 +33,21 @@ function registerNoteCommands(program) {
       const spinner = ora('노트 목록 불러오는 중...').start();
       try {
         const client = config.createApiClient();
-        const { data } = await client.get('/notes', {
-          params: { search: options.search, limit: Number(options.limit) }
-        });
+        const { data } = await client.get('/pages');
         spinner.succeed('불러오기 완료');
-        const rows = Array.isArray(data) ? data : data.items || [];
+        const rows = (Array.isArray(data) ? data : data.items || [])
+          .filter((item) => item.type === 'document')
+          .filter((item) => {
+            if (!options.search) return true;
+            return String(item.title || '').toLowerCase().includes(String(options.search).toLowerCase());
+          })
+          .slice(0, Number(options.limit));
+
+        if (rows.length === 0) {
+          console.log(chalk.dim('표시할 문서가 없습니다.'));
+          return;
+        }
+
         rows.forEach((item, idx) => {
           console.log(
             `${chalk.dim(String(idx + 1).padStart(2, ' '))} ${chalk.bold(item.title || '(untitled)')} ${chalk.dim(item.updatedAt || '')} ${chalk.dim(item.id || '')}`
@@ -45,11 +67,14 @@ function registerNoteCommands(program) {
       const spinner = ora('노트 생성 중...').start();
       try {
         const client = config.createApiClient();
-        const { data } = await client.post('/notes', { title });
+        const { data } = await client.post('/pages', {
+          title,
+          type: 'document'
+        });
         spinner.succeed('생성 완료');
         console.log(chalk.green('✓'), `id: ${chalk.dim(data.id)}`);
         if (options.open) {
-          const url = `${config.getBaseUrl().replace('api.', '').replace(/\/$/, '')}/notes/${data.id}`;
+          const url = `${config.getBaseUrl().replace(/\/$/, '')}/pages/${data.id}`;
           await open(url);
         }
       } catch (error) {
@@ -63,10 +88,10 @@ function registerNoteCommands(program) {
     const spinner = ora('노트 불러오는 중...').start();
     try {
       const client = config.createApiClient();
-      const { data } = await client.get(`/notes/${id}`);
+      const { data } = await client.get(`/pages/${id}`);
       spinner.stop();
       console.log(`# ${data.title || ''}\n`);
-      console.log(data.content || '');
+      console.log(formatContent(data.content));
     } catch (error) {
       spinner.fail('조회 실패');
       console.error(chalk.red('✗'), error.response?.data?.message || error.message);
@@ -76,24 +101,25 @@ function registerNoteCommands(program) {
 
   note.command('edit <id>').action(async (id) => {
     const spinner = ora('노트 가져오는 중...').start();
-    const tmpPath = path.join(os.tmpdir(), `obnofi-${id}.md`);
+    const tmpPath = path.join(os.tmpdir(), `obnofi-${id}.json`);
     try {
       const client = config.createApiClient();
-      const { data } = await client.get(`/notes/${id}`);
-      fs.writeFileSync(tmpPath, `# ${data.title || ''}\n\n${data.content || ''}`);
+      const { data } = await client.get(`/pages/${id}`);
+      fs.writeFileSync(tmpPath, JSON.stringify({
+        title: data.title || '',
+        content: data.content || {}
+      }, null, 2));
       spinner.succeed('에디터를 엽니다');
 
       const editor = process.env.EDITOR || 'vi';
       execSync(`${editor} ${tmpPath}`, { stdio: 'inherit' });
 
-      const saved = fs.readFileSync(tmpPath, 'utf8');
-      const lines = saved.split('\n');
-      const first = lines[0] || '';
-      const title = first.replace(/^#\s*/, '').trim();
-      const content = lines.slice(2).join('\n').trim();
+      const saved = JSON.parse(fs.readFileSync(tmpPath, 'utf8'));
+      const title = String(saved.title || '').trim();
+      const content = parseEditedContent(JSON.stringify(saved.content ?? {}));
 
       const saveSpinner = ora('저장 중...').start();
-      await client.patch(`/notes/${id}`, { title, content });
+      await client.patch(`/pages/${id}`, { title, content });
       saveSpinner.succeed('저장 완료');
       fs.unlinkSync(tmpPath);
       console.log(chalk.green('✓'), '수정 완료');
@@ -127,7 +153,7 @@ function registerNoteCommands(program) {
       const spinner = ora('노트 삭제 중...').start();
       try {
         const client = config.createApiClient();
-        await client.delete(`/notes/${id}`);
+        await client.delete(`/pages/${id}`);
         spinner.succeed('삭제 완료');
         console.log(chalk.green('✓'), '노트를 삭제했습니다.');
       } catch (error) {
