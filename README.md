@@ -8,6 +8,48 @@ obnofi 워크스페이스와 상호 작용하기 위한 커맨드 라인 인터�
 npm install -g obnofi-cli
 ```
 
+## 배포
+
+이 저장소는 `npm version` + 태그 푸시 기반으로 릴리즈됩니다.
+
+### 사전 설정
+
+- GitHub Actions secret에 `NPM_TOKEN`을 등록합니다.
+- npm 패키지 권한이 있는 토큰이어야 합니다.
+- 워크플로우는 `main` 브랜치에 포함된 태그에서만 publish 합니다.
+
+### 릴리즈 절차
+
+패치/마이너/메이저 중 하나를 선택해서 버전을 올립니다.
+
+```bash
+npm version patch
+# 또는
+npm version minor
+# 또는
+npm version major
+```
+
+그 다음 `main`과 태그를 함께 푸시합니다.
+
+```bash
+git push origin main --tags
+```
+
+그러면 GitHub Actions가 자동으로 아래 순서로 실행됩니다.
+
+1. 태그와 `package.json` 버전 일치 여부 확인
+2. 태그 커밋이 `main` 브랜치에 포함되어 있는지 확인
+3. `npm ci`
+4. `npm run check`
+5. `npm run smoke`
+6. `npm run pack:check`
+7. `npm publish --provenance --access public`
+8. GitHub Release 생성
+9. GitHub 자동 생성 release notes 포함
+
+검증 단계 중 하나라도 실패하면 npm publish와 GitHub Release 생성은 진행되지 않습니다.
+
 ## 사용법
 
 ```bash
